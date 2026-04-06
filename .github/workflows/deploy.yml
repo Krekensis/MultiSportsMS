@@ -1,0 +1,35 @@
+name: Sync to Hugging Face Hub
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to Hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          # 1. Exit if token is missing
+          if [ -z "$HF_TOKEN" ]; then
+            echo "Error: HF_TOKEN is empty. Please add it to GitHub Settings > Secrets > Actions."
+            exit 1
+          fi
+
+          # 2. Configure git
+          git config --global user.email "samitkoya@users.noreply.github.com"
+          git config --global user.name "Samit Reddy"
+          
+          # 3. Push to Hugging Face
+          # We use the 'main' branch since your local is 'main'
+          # If HF expects 'main', this works. If HF is empty, it creates 'main'.
+          echo "Commencing sync to Hugging Face..."
+          git push --force https://samitkoya:$HF_TOKEN@huggingface.co/spaces/samitkoya/MultiSportsMS main:main

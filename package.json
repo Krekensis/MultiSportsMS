@@ -1,0 +1,17 @@
+{
+  "name": "msms",
+  "version": "1.0.0",
+  "description": "Multi-Sports Management System - DBMS Course Project",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "node backend/server.js",
+    "build:frontend": "cd frontend2 && npm install && npm run build",
+    "reset-db": "node backend/database/init.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "sql.js": "^1.11.0"
+  }
+}
