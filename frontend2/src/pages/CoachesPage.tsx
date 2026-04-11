@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
+import { CoachAvatar } from "@/components/CoachAvatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ export default function CoachesPage() {
     phone: "",
     specialization: "",
     experience_years: "",
+    coach_image_url: "",
   });
 
   const { data: coaches, isLoading } = useQuery({ queryKey: ["coaches"], queryFn: getCoaches });
@@ -76,7 +78,7 @@ export default function CoachesPage() {
   const openCreate = () => {
     setIsEdit(false);
     setSelectedCoachId(null);
-    setForm({ first_name: "", last_name: "", email: "", phone: "", specialization: "", experience_years: "" });
+    setForm({ first_name: "", last_name: "", email: "", phone: "", specialization: "", experience_years: "", coach_image_url: "" });
     setCreateOpen(true);
   };
 
@@ -90,6 +92,7 @@ export default function CoachesPage() {
       phone: coach.phone || "",
       specialization: coach.specialization || "",
       experience_years: coach.experience_years ? String(coach.experience_years) : "",
+      coach_image_url: coach.coach_image_url || "",
     });
     setCreateOpen(true);
   };
@@ -120,8 +123,13 @@ export default function CoachesPage() {
               coaches.map((coach) => (
                 <TableRow key={coach.coach_id} className="border-border">
                   <TableCell className="font-medium text-foreground">
-                    <div>{coach.first_name} {coach.last_name}</div>
-                    <div className="text-xs text-muted-foreground">{coach.email || "No email"}</div>
+                    <div className="flex items-center gap-3">
+                      <CoachAvatar src={coach.coach_image_url} alt={coach.first_name} />
+                      <div>
+                        <div>{coach.first_name} {coach.last_name}</div>
+                        <div className="text-xs text-muted-foreground">{coach.email || "No email"}</div>
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{coach.specialization || "-"}</TableCell>
                   <TableCell className="text-muted-foreground">{coach.experience_years} yrs</TableCell>
@@ -182,6 +190,12 @@ export default function CoachesPage() {
               <div className="space-y-2">
                 <Label>Experience Years</Label>
                 <Input type="number" value={form.experience_years} onChange={(e) => setForm({ ...form, experience_years: e.target.value })} className="bg-secondary border-border" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Coach Image URL</Label>
+                <Input value={form.coach_image_url} onChange={(e) => setForm({ ...form, coach_image_url: e.target.value })} className="bg-secondary border-border" />
               </div>
             </div>
           </div>

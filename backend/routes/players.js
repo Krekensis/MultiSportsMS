@@ -204,7 +204,7 @@ router.get('/', (req, res) => {
             SELECT
                 p.player_id, p.first_name, p.last_name, p.email,
                 p.date_of_birth, p.gender, p.jersey_number, p.position,
-                p.status, p.joined_date,
+                p.status, p.joined_date, p.player_image_url,
                 t.team_id, t.name AS team_name,
                 s.sport_id, s.name AS sport_name
             FROM players p
@@ -287,7 +287,7 @@ router.get('/:id', (req, res) => {
             SELECT
                 p.player_id, p.first_name, p.last_name, p.email,
                 p.date_of_birth, p.gender, p.jersey_number, p.position,
-                p.status, p.joined_date,
+                p.status, p.joined_date, p.player_image_url,
                 t.team_id, t.name AS team_name,
                 s.sport_id, s.name AS sport_name
             FROM players p
@@ -339,6 +339,7 @@ router.post('/', (req, res) => {
             team_id,
             jersey_number,
             position,
+            player_image_url,
         } = req.body;
 
         if (!first_name || !last_name) {
@@ -351,14 +352,15 @@ router.post('/', (req, res) => {
 
         const runCreate = db.transaction(() => {
             const result = db.prepare(`
-                INSERT INTO players (first_name, last_name, email, date_of_birth, gender)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO players (first_name, last_name, email, date_of_birth, gender, player_image_url)
+                VALUES (?, ?, ?, ?, ?, ?)
             `).run(
                 first_name,
                 last_name,
                 email || null,
                 date_of_birth || null,
                 gender || null,
+                player_image_url || null,
             );
 
             if (normalizedMemberships.length) {
@@ -373,7 +375,7 @@ router.post('/', (req, res) => {
             SELECT
                 p.player_id, p.first_name, p.last_name, p.email,
                 p.date_of_birth, p.gender, p.jersey_number, p.position,
-                p.status, p.joined_date,
+                p.status, p.joined_date, p.player_image_url,
                 t.team_id, t.name AS team_name,
                 s.sport_id, s.name AS sport_name
             FROM players p
@@ -409,6 +411,7 @@ router.put('/:id', (req, res) => {
             team_id,
             jersey_number,
             position,
+            player_image_url,
         } = req.body;
 
         const existing = db.prepare('SELECT * FROM players WHERE player_id = ? AND is_deleted = 0').get(req.params.id);
@@ -430,7 +433,7 @@ router.put('/:id', (req, res) => {
             db.prepare(`
                 UPDATE players
                 SET first_name = ?, last_name = ?, email = ?, date_of_birth = ?,
-                    gender = ?, status = ?
+                    gender = ?, status = ?, player_image_url = ?
                 WHERE player_id = ?
             `).run(
                 first_name || existing.first_name,
@@ -439,6 +442,7 @@ router.put('/:id', (req, res) => {
                 date_of_birth !== undefined ? date_of_birth : existing.date_of_birth,
                 gender !== undefined ? gender : existing.gender,
                 status || existing.status,
+                player_image_url !== undefined ? player_image_url : existing.player_image_url,
                 req.params.id,
             );
 
@@ -453,7 +457,7 @@ router.put('/:id', (req, res) => {
             SELECT
                 p.player_id, p.first_name, p.last_name, p.email,
                 p.date_of_birth, p.gender, p.jersey_number, p.position,
-                p.status, p.joined_date,
+                p.status, p.joined_date, p.player_image_url,
                 t.team_id, t.name AS team_name,
                 s.sport_id, s.name AS sport_name
             FROM players p

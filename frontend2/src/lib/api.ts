@@ -45,6 +45,7 @@ export interface Player {
   memberships: PlayerMembership[];
   membership_count: number;
   team_names: string;
+  player_image_url: string | null;
 }
 
 export interface PlayerMembership {
@@ -131,6 +132,7 @@ export interface Event {
   description: string | null;
   sport_name: string;
   team_count?: number;
+  event_image_url?: string | null;
 }
 
 export interface Coach {
@@ -143,6 +145,7 @@ export interface Coach {
   experience_years: number;
   team_count?: number;
   team_names?: string | null;
+  coach_image_url?: string | null;
 }
 
 export interface Venue {

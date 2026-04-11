@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-interface TeamAvatarProps {
+interface EventAvatarProps {
   src?: string | null;
   alt: string;
   className?: string;
@@ -9,7 +9,7 @@ interface TeamAvatarProps {
 
 const PLACEHOLDER_SRC = "/placeholder.svg";
 
-export function TeamAvatar({ src, alt, className }: TeamAvatarProps) {
+export function EventAvatar({ src, alt, className }: EventAvatarProps) {
   const [imageSrc, setImageSrc] = useState(src || PLACEHOLDER_SRC);
 
   return (

@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS coaches (
     email            TEXT    UNIQUE,
     phone            TEXT,
     specialization   TEXT,
+    coach_image_url  TEXT,
     experience_years INTEGER DEFAULT 0 CHECK (experience_years >= 0),
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -97,6 +98,7 @@ CREATE TABLE IF NOT EXISTS players (
     team_id       INTEGER,
     jersey_number INTEGER,
     position      TEXT,                                              -- sport-specific position label
+    player_image_url TEXT,
     status        TEXT    DEFAULT 'active' CHECK (status IN ('active', 'injured', 'retired', 'suspended')),
     is_deleted    BOOLEAN DEFAULT 0,                                 -- soft delete flag
     joined_date   DATE    DEFAULT CURRENT_DATE,
@@ -141,6 +143,7 @@ CREATE TABLE IF NOT EXISTS events (
     end_date    DATE,
     status      TEXT    DEFAULT 'upcoming' CHECK (status IN ('upcoming', 'ongoing', 'completed', 'cancelled')),
     description TEXT,
+    event_image_url TEXT,
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (sport_id) REFERENCES sports(sport_id) ON DELETE CASCADE

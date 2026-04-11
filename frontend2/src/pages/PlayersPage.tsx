@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BarChart3, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import {
   type Player,
   createPlayer,
@@ -56,6 +57,7 @@ type PlayerForm = {
   email: string;
   date_of_birth: string;
   gender: string;
+  player_image_url: string;
   memberships: MembershipForm[];
 };
 
@@ -74,6 +76,7 @@ const emptyForm = (): PlayerForm => ({
   email: "",
   date_of_birth: "",
   gender: "",
+  player_image_url: "",
   memberships: [emptyMembership()],
 });
 
@@ -130,7 +133,7 @@ export default function PlayersPage() {
       .map((membership) => `${membership.team_name} ${membership.membership_type} ${membership.position || ""}`)
       .join(" ");
 
-    return `${player.first_name} ${player.last_name} ${player.email || ""} ${player.team_names} ${membershipText}`
+    return `${player.first_name} ${player.last_name} ${player.email || ""} ${player.team_names} ${player.player_image_url || ""} ${membershipText}`
       .toLowerCase()
       .includes(q);
   });
@@ -176,6 +179,7 @@ export default function PlayersPage() {
     email: form.email || undefined,
     date_of_birth: form.date_of_birth || undefined,
     gender: form.gender || undefined,
+    player_image_url: form.player_image_url || undefined,
     memberships: form.memberships
       .filter((membership) => membership.team_id)
       .map((membership) => ({
@@ -191,7 +195,7 @@ export default function PlayersPage() {
   const handleSave = () => {
     const payload = buildPayload();
     if (isEdit && selectedPlayerId) {
-    updateMut.mutate({ id: selectedPlayerId, body: payload });
+      updateMut.mutate({ id: selectedPlayerId, body: payload });
       return;
     }
     createMut.mutate(payload);
@@ -222,6 +226,7 @@ export default function PlayersPage() {
       first_name: player.first_name || "",
       last_name: player.last_name || "",
       email: player.email || "",
+      player_image_url: player.player_image_url || "",
       date_of_birth: player.date_of_birth ? new Date(player.date_of_birth).toISOString().split("T")[0] : "",
       gender: player.gender || "",
       memberships: activeMemberships.length > 0 ? activeMemberships : [emptyMembership()],
@@ -269,8 +274,13 @@ export default function PlayersPage() {
               filtered.map((player) => (
                 <TableRow key={player.player_id} className="border-border">
                   <TableCell className="font-medium text-foreground">
-                    <div>{player.first_name} {player.last_name}</div>
-                    <div className="text-xs text-muted-foreground">{player.email || "No email"}</div>
+                    <div className="flex items-center gap-3">
+                      <PlayerAvatar src={player.player_image_url} alt={player.first_name} />
+                      <div>
+                        <div>{player.first_name} {player.last_name}</div>
+                        <div className="text-xs text-muted-foreground">{player.email || "No email"}</div>
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary">{player.team_names || "Unassigned"}</Badge>
@@ -358,9 +368,15 @@ export default function PlayersPage() {
                 <Input value={form.gender} onChange={(e) => setForm((current) => ({ ...current, gender: e.target.value }))} className="bg-secondary border-border" />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Date of Birth</Label>
-              <Input type="date" value={form.date_of_birth} onChange={(e) => setForm((current) => ({ ...current, date_of_birth: e.target.value }))} className="bg-secondary border-border" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Date of Birth</Label>
+                <Input type="date" value={form.date_of_birth} onChange={(e) => setForm((current) => ({ ...current, date_of_birth: e.target.value }))} className="bg-secondary border-border" />
+              </div>
+              <div className="space-y-2">
+                <Label>Player Image URL</Label>
+                <Input value={form.player_image_url} onChange={(e) => setForm((current) => ({ ...current, player_image_url: e.target.value }))} className="bg-secondary border-border" />
+              </div>
             </div>
 
             <div className="space-y-4 rounded-lg border border-border/60 p-4">
