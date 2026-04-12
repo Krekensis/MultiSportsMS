@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Pencil, ClipboardCheck } from "lucide-react";
-import { getMatches, logMatchResult, logMatchScore, scheduleMatch, updateMatchStatus, deleteMatch, getEvents, getTeams, type Match } from "@/lib/api";
+import { Plus, Trash2, Pencil, ClipboardCheck, Activity } from "lucide-react";
+import { getMatches, logMatchResult, logMatchScore, scheduleMatch, updateMatchStatus, deleteMatch, getEvents, getTeams, getPlayers, getMatchDetails, savePlayerMatchStats, type Match } from "@/lib/api";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -49,8 +49,18 @@ export default function MatchesPage() {
   const { data: teams } = useQuery({ queryKey: ["teams"], queryFn: getTeams });
 
   const [resultOpen, setResultOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [scores, setScores] = useState({ team1_score: "", team2_score: "" });
+  const [selectedTeamId, setSelectedTeamId] = useState("");
+  const [statsForm, setStatsForm] = useState<any>({ player_id: "" });
+
+  const { data: players } = useQuery({ queryKey: ["players"], queryFn: getPlayers });
+  const { data: currentMatchDetails, isLoading: loadingMatchDetails } = useQuery({
+    queryKey: ["match", selectedMatch?.match_id],
+    queryFn: () => getMatchDetails(selectedMatch!.match_id),
+    enabled: !!selectedMatch?.match_id && (statsOpen || resultOpen),
+  });
 
   const [createOpen, setCreateOpen] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
@@ -107,6 +117,16 @@ export default function MatchesPage() {
     onError: () => toast.error("Failed to log result"),
   });
 
+  const statsMut = useMutation({
+    mutationFn: (data: { matchId: number, body: any }) => savePlayerMatchStats(data.matchId, data.body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["match", selectedMatch?.match_id] });
+      setStatsForm({ player_id: "" });
+      toast.success("Player stats logged");
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to log player stats"),
+  });
+
   const handleSaveMatch = () => {
     const b = {
       event_id: form.event_id !== "standalone" ? Number(form.event_id) : undefined,
@@ -155,6 +175,18 @@ export default function MatchesPage() {
     setResultOpen(true);
   };
 
+  const openStats = (m: Match) => {
+    setSelectedMatch(m);
+    setSelectedTeamId(String(m.team1_id));
+    setStatsForm({ player_id: "" });
+    setStatsOpen(true);
+  };
+
+  const handleSaveStats = () => {
+    if (!selectedMatch || !statsForm.player_id) return;
+    statsMut.mutate({ matchId: selectedMatch.match_id, body: { ...statsForm, player_id: Number(statsForm.player_id) } });
+  };
+
   return (
     <AppLayout>
       <PageHeader title="Matches" description="View and manage all matches">
@@ -197,7 +229,10 @@ export default function MatchesPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                     <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="icon" title="Log Player Stats" onClick={() => openStats(m)}>
+                        <Activity size={16} className="text-sport-blue" />
+                      </Button>
                       <Button variant="ghost" size="sm" className="gap-1.5 text-primary" onClick={() => openResult(m)}>
                         <ClipboardCheck size={14} /> {m.status === "completed" ? "Edit Result" : "Log Result"}
                       </Button>
@@ -250,6 +285,145 @@ export default function MatchesPage() {
             <Button onClick={() => selectedMatch && logMut.mutate(selectedMatch)} disabled={logMut.isPending || scores.team1_score === "" || scores.team2_score === ""}>
               Submit Result
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Log Player Stats Dialog */}
+      <Dialog open={statsOpen} onOpenChange={setStatsOpen}>
+        <DialogContent className="glass-card border-border max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Log Player Statistics</DialogTitle>
+            <DialogDescription>
+              {selectedMatch ? `${selectedMatch.team1_name} vs ${selectedMatch.team2_name}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4 border-b border-border pb-4">
+              <div className="space-y-2">
+                <Label>Team</Label>
+                <Select value={selectedTeamId} onValueChange={(v) => { setSelectedTeamId(v); setStatsForm({ player_id: "" }); }}>
+                  <SelectTrigger className="bg-secondary border-border">
+                    <SelectValue placeholder="Select team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={String(selectedMatch?.team1_id)}>{selectedMatch?.team1_name}</SelectItem>
+                    <SelectItem value={String(selectedMatch?.team2_id)}>{selectedMatch?.team2_name}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Player</Label>
+                <Select value={statsForm.player_id} onValueChange={(v) => setStatsForm({ player_id: v })}>
+                  <SelectTrigger className="bg-secondary border-border">
+                    <SelectValue placeholder="Select player" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {players?.filter(p => String(p.team_id) === selectedTeamId).map((p) => (
+                      <SelectItem key={p.player_id} value={String(p.player_id)}>
+                        {p.first_name} {p.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {statsForm.player_id && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-2">
+                {selectedMatch?.sport_name?.toLowerCase().includes("cricket") && (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Runs</Label>
+                      <Input type="number" min={0} value={statsForm.runs_scored || ""} onChange={(e) => setStatsForm({ ...statsForm, runs_scored: e.target.value })} className="bg-secondary/50 h-8 text-sm" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Balls</Label>
+                      <Input type="number" min={0} value={statsForm.balls_faced || ""} onChange={(e) => setStatsForm({ ...statsForm, balls_faced: e.target.value })} className="bg-secondary/50 h-8 text-sm" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Wickets</Label>
+                      <Input type="number" min={0} value={statsForm.wickets_taken || ""} onChange={(e) => setStatsForm({ ...statsForm, wickets_taken: e.target.value })} className="bg-secondary/50 h-8 text-sm" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Overs</Label>
+                      <Input type="number" min={0} step="0.1" value={statsForm.overs_bowled || ""} onChange={(e) => setStatsForm({ ...statsForm, overs_bowled: e.target.value })} className="bg-secondary/50 h-8 text-sm" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Runs Conc.</Label>
+                      <Input type="number" min={0} value={statsForm.runs_conceded || ""} onChange={(e) => setStatsForm({ ...statsForm, runs_conceded: e.target.value })} className="bg-secondary/50 h-8 text-sm" />
+                    </div>
+                  </>
+                )}
+                {(selectedMatch?.sport_name?.toLowerCase().includes("football") || selectedMatch?.sport_name?.toLowerCase().includes("soccer")) && (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Goals</Label>
+                      <Input type="number" min={0} value={statsForm.goals_scored || ""} onChange={(e) => setStatsForm({ ...statsForm, goals_scored: e.target.value })} className="bg-secondary/50 h-8 text-sm" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Assists</Label>
+                      <Input type="number" min={0} value={statsForm.assists || ""} onChange={(e) => setStatsForm({ ...statsForm, assists: e.target.value })} className="bg-secondary/50 h-8 text-sm" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Yellow</Label>
+                      <Input type="number" min={0} value={statsForm.yellow_cards || ""} onChange={(e) => setStatsForm({ ...statsForm, yellow_cards: e.target.value })} className="bg-secondary/50 h-8 text-sm" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Red</Label>
+                      <Input type="number" min={0} value={statsForm.red_cards || ""} onChange={(e) => setStatsForm({ ...statsForm, red_cards: e.target.value })} className="bg-secondary/50 h-8 text-sm" />
+                    </div>
+                  </>
+                )}
+                {(selectedMatch?.sport_name?.toLowerCase().includes("tennis") || selectedMatch?.sport_name?.toLowerCase().includes("badminton")) && (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Points</Label>
+                      <Input type="number" min={0} value={statsForm.points_won || ""} onChange={(e) => setStatsForm({ ...statsForm, points_won: e.target.value })} className="bg-secondary/50 h-8 text-sm" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Sets</Label>
+                      <Input type="number" min={0} value={statsForm.sets_won || ""} onChange={(e) => setStatsForm({ ...statsForm, sets_won: e.target.value })} className="bg-secondary/50 h-8 text-sm" />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            
+            <div className="flex justify-end gap-2 mt-2">
+               <Button variant="secondary" size="sm" onClick={() => setStatsForm({ player_id: statsForm.player_id })}>Clear</Button>
+               <Button size="sm" onClick={handleSaveStats} disabled={!statsForm.player_id || statsMut.isPending}>Save Stat</Button>
+            </div>
+
+            {loadingMatchDetails ? (
+              <div className="text-xs text-muted-foreground mt-4">Loading logged stats...</div>
+            ) : currentMatchDetails?.player_stats && currentMatchDetails.player_stats.length > 0 && (
+              <div className="mt-4 border-t border-border pt-4">
+                <Label className="mb-2 block">Previously Logged</Label>
+                <div className="max-h-[150px] overflow-y-auto custom-scrollbar">
+                  <Table className="text-xs">
+                    <TableBody>
+                      {currentMatchDetails.player_stats.map((s: any) => (
+                        <TableRow key={s.record_id} className="border-border">
+                          <TableCell className="font-medium">{s.player_name}</TableCell>
+                          <TableCell className="text-muted-foreground">{s.team_name}</TableCell>
+                          <TableCell className="text-right">
+                             {s.runs_scored > 0 ? `Runs: ${s.runs_scored} ` : ""}
+                             {s.wickets_taken > 0 ? `Wkt: ${s.wickets_taken} ` : ""}
+                             {s.goals_scored > 0 ? `Gls: ${s.goals_scored} ` : ""}
+                             {s.points_won > 0 ? `Pts: ${s.points_won} ` : ""}
+                             {s.sets_won > 0 ? `Sets: ${s.sets_won} ` : ""}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatsOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

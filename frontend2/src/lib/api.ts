@@ -232,6 +232,12 @@ export const updateMatchStatus = (id: number, data: Record<string, unknown>) =>
 export const deleteMatch = (id: number) =>
   fetchJSON(`/matches/${id}`, { method: "DELETE" });
 
+export const getMatchDetails = (id: number) =>
+  fetchJSON<Match & { player_stats?: any[]; events?: any[] }>(`/matches/${id}`);
+
+export const savePlayerMatchStats = (id: number, data: any) =>
+  fetchJSON(`/matches/${id}/stats`, { method: "POST", body: JSON.stringify(data) });
+
 // Sports
 export const getSports = () =>
   fetchJSON<Array<{ sport_id: number; name: string; category: string; rules_json: unknown; min_players_per_team: number; max_players_per_team: number; description: string; scoring_unit: string }>>("/sports");
