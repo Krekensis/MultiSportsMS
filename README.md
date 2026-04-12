@@ -9,6 +9,8 @@ pinned: false
 
 # Multi-Sports Management System (MSMS) 🏆
 
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/samitkoya/MultiSportsMS)
+
 The **Multi-Sports Management System (MSMS)** is a comprehensive, database-driven application designed to streamline the management of sporting events, teams, players, and performance analytics. Developed as a high-performance relational database project, it demonstrates advanced SQL techniques and modern web architecture.
 
 ## 🌟 Key Features
@@ -18,7 +20,8 @@ The **Multi-Sports Management System (MSMS)** is a comprehensive, database-drive
 - **Venue Management**: Track locations, seating capacity, and surface types for various sporting facilities.
 - **Staff & Coaching**: Manage coaching staff with specialized skill sets and experience levels.
 - **Team Administration**: Organize teams by sport, with dedicated home venues and assigned coaches.
-- **Player Profiles**: Comprehensive player rosters with jersey numbers, positions, and status tracking (Active/Injured/Retired).
+- **Player Profiles**: Comprehensive player rosters with jersey numbers, positions, and status tracking.
+- **Multi-Sport Support**: Athletes can participate in multiple sports simultaneously (e.g., Cricket and Football) with independent statistics tracking for each.
 
 ### ⚔️ Match & Event tracking
 - **Event Orchestration**: Manage Tournaments, Leagues, Friendlies, and Championships with distinct formats (Knockout/Round-robin).
@@ -28,7 +31,7 @@ The **Multi-Sports Management System (MSMS)** is a comprehensive, database-drive
 
 ### 📊 Advanced Analytics (Database Views)
 - **Team Standings**: Real-time league tables with Wins, Losses, Draws, and Points calculations.
-- **Player Statistics**: Career-wide performance metrics (Total Runs, Goals, Wickets, Average Ratings).
+- **Player Statistics**: Career-wide performance metrics (Total Runs, Goals, Wickets, Average Ratings) with dedicated tabs for multi-sport athletes.
 - **Top Scorers**: Automatic leaderboards filtered by sport.
 - **Upcoming Matches**: A chronological view of all scheduled fixtures with venue details.
 
@@ -62,13 +65,23 @@ MSMS is powered by a robust 3NF relational schema consisting of **13 Tables**, *
 3. Build the frontend: `npm run build:frontend`.
 4. Start the server: `npm start`.
 
-For detailed instructions, see [RUN_HOWTO.md](./RUN_HOWTO.md).
+## Hugging Face Deployment
 
-### Hugging Face Deployment
 This project is configured for **Hugging Face Spaces** using the Docker SDK.
+
+### Deployment Matrix
+
+| Environment | Platform | Deployment Method | Default Port | Storage |
+| :--- | :--- | :--- | :--- | :--- |
+| **Local Development** | Node.js | `npm start` | `3000` | Local `msms.db` |
+| **Docker** | Container | `docker build -t msms .` | `7860` | Ephemeral (Container) |
+| **HF Spaces** | Cloud | Git Push (Docker SDK) | `7860` | Ephemeral (Space) |
+
+#### Hugging Face Steps:
 1. Create a new Space on Hugging Face.
 2. Select **Docker** as the SDK.
 3. Push the repository to the Space.
+4. Ensure the `PORT` environment variable is set to `7860` (handled automatically by `Dockerfile`).
 
 ---
 

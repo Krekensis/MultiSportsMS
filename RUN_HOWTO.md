@@ -39,11 +39,11 @@ cd ..
 ## 📊 Step 2: Database Setup
 
 The project uses **sql.js** (SQLite in WebAssembly), so no external database server (like MySQL or PostgreSQL) is required.
-To initialize the database with schema and seed data, run:
+To initialize the database with the new multi-sport schema and seed data, run:
 ```bash
 npm run reset-db
 ```
-This will create a `backend/database/msms.db` file.
+**Note:** This command is essential to populate the `player_sports` table, which enables the new tabbed statistics and multi-sport player profiles.
 
 ---
 
@@ -105,3 +105,4 @@ Wait for the dev server to start (usually at [http://localhost:5173](http://loca
 2. Choose **Docker** as the SDK.
 3. Push the entire project repository.
 4. Hugging Face will automatically use the included `Dockerfile` to build and serve the application.
+5. You can view the live demo at: **[huggingface.co/spaces/samitkoya/MultiSportsMS](https://huggingface.co/spaces/samitkoya/MultiSportsMS)**
