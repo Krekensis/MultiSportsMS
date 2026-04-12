@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Pencil, ShieldPlus } from "lucide-react";
-import { getEvents, getSports, getTeams, createEvent, updateEvent, deleteEvent, registerTeamToEvent } from "@/lib/api";
+import { getEvents, getEvent, getSports, getTeams, createEvent, updateEvent, deleteEvent, registerTeamToEvent } from "@/lib/api";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { EventAvatar } from "@/components/EventAvatar";
@@ -35,6 +35,12 @@ export default function TournamentsPage() {
   const { data: sports } = useQuery({ queryKey: ["sports"], queryFn: getSports });
   const { data: teams } = useQuery({ queryKey: ["teams"], queryFn: getTeams });
 
+  const { data: currentEventDetails, isLoading: loadingEventDetails } = useQuery({
+    queryKey: ["event", selectedEventId],
+    queryFn: () => getEvent(selectedEventId as number),
+    enabled: !!selectedEventId && assignOpen,
+  });
+
   const createMut = useMutation({
     mutationFn: createEvent,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["events"] }); setCreateOpen(false); toast.success("Tournament created"); },
@@ -55,8 +61,15 @@ export default function TournamentsPage() {
 
   const assignMut = useMutation({
     mutationFn: (data: { eventId: number; teamId: number }) => registerTeamToEvent(data.eventId, data.teamId),
-    onSuccess: () => { setAssignOpen(false); toast.success("Team registered successfully"); },
-    onError: () => toast.error("Failed to register team"),
+    onSuccess: () => { 
+      qc.invalidateQueries({ queryKey: ["event", selectedEventId] });
+      qc.invalidateQueries({ queryKey: ["events"] });
+      setAssignTeamId("");
+      toast.success("Team registered successfully"); 
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to register team")
+    },
   });
 
   const eventStatus = (e: { start_date: string; end_date: string; status: string }) => {
@@ -284,17 +297,44 @@ export default function TournamentsPage() {
             <DialogTitle className="text-foreground">Register Team to Tournament</DialogTitle>
             <DialogDescription>Select a team to participate in this tournament.</DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <div className="space-y-2">
-              <Label>Team</Label>
+          <div className="py-4 space-y-6">
+            <div className="space-y-3">
+              <Label className="text-foreground font-semibold">Registered Teams</Label>
+              {loadingEventDetails ? (
+                <div className="text-sm text-muted-foreground">Loading registered teams...</div>
+              ) : currentEventDetails?.teams && currentEventDetails.teams.length > 0 ? (
+                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                  {currentEventDetails.teams.map((t: any) => (
+                    <div key={t.team_id} className="flex items-center justify-between p-2 rounded-md bg-secondary/50 border border-border">
+                      <span className="text-sm font-medium">{t.name}</span>
+                      <Badge variant="outline" className="text-[10px]">{t.status}</Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground italic bg-secondary/30 p-3 rounded-md border border-border/50 text-center">
+                  No teams registered yet.
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-border">
+              <Label>Add a Team</Label>
               <Select value={assignTeamId} onValueChange={setAssignTeamId}>
                 <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue placeholder="Select team" />
+                  <SelectValue placeholder="Select team to register" />
                 </SelectTrigger>
                 <SelectContent>
                   {teams?.filter((t) => {
                     const selectedEvent = events?.find((event) => event.event_id === selectedEventId);
-                    return !selectedEvent || t.sport_id === selectedEvent.sport_id;
+                    if (selectedEvent && t.sport_id !== selectedEvent.sport_id) return false;
+                    
+                    // Filter out already registered teams
+                    if (currentEventDetails?.teams?.some((rt: any) => rt.team_id === t.team_id)) {
+                      return false;
+                    }
+                    
+                    return true;
                   }).map((t) => (
                     <SelectItem key={t.team_id} value={String(t.team_id)}>{t.name} ({t.sport_name})</SelectItem>
                   ))}
@@ -303,9 +343,9 @@ export default function TournamentsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setAssignOpen(false)}>Close</Button>
             <Button onClick={handleAssign} disabled={assignMut.isPending || !assignTeamId}>
-              Register
+              Register Team
             </Button>
           </DialogFooter>
         </DialogContent>

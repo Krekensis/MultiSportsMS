@@ -5,7 +5,10 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
-  if (!res.ok) throw new Error(`API Error: ${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    const errData = await res.json().catch(() => null);
+    throw new Error(errData?.error || `API Error: ${res.status} ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -236,6 +239,9 @@ export const getSports = () =>
 // Events
 export const getEvents = () =>
   fetchJSON<Event[]>("/events");
+
+export const getEvent = (id: number) =>
+  fetchJSON<Event & { teams: any[]; matches: any[] }>(`/events/${id}`);
 
 export const createEvent = (data: Record<string, unknown>) =>
   fetchJSON("/events", { method: "POST", body: JSON.stringify(data) });
