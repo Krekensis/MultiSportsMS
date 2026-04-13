@@ -21,7 +21,8 @@ The **Multi-Sports Management System (MSMS)** is a comprehensive, database-drive
 - **Staff & Coaching**: Manage coaching staff with specialized skill sets and experience levels.
 - **Team Administration**: Organize teams by sport, with dedicated home venues and assigned coaches.
 - **Player Profiles**: Comprehensive player rosters with jersey numbers, positions, and status tracking.
-- **Multi-Sport Support**: Athletes can participate in multiple sports simultaneously (e.g., Cricket and Football) with independent statistics tracking for each.
+- **Multi-Sport Support**: Athletes can participate in multiple sports simultaneously (using a dedicated `player_sports` junction table) with tabbed independent statistics for each sport.
+- **Advanced Navigation**: Interactive sorting and filtering across pages (Venues, Matches, Tournaments, Teams) for seamless data exploration.
 
 ### ⚔️ Match & Event tracking
 - **Event Orchestration**: Manage Tournaments, Leagues, Friendlies, and Championships with distinct formats (Knockout/Round-robin).
@@ -39,7 +40,8 @@ The **Multi-Sports Management System (MSMS)** is a comprehensive, database-drive
 
 ## 🛠️ Technology Stack
 
-- **Frontend**: [React 18](https://reactjs.org/) + [Vite](https://vitejs.dev/)
+- **Frontend**: [React 18](https://reactjs.org/) + [Vite](https://vitejs.dev/) + [TypeScript](https://www.typescriptlang.org/)
+- **Data & Visualization**: [React Query](https://tanstack.com/query) + [Recharts](https://recharts.org/)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)
 - **Backend**: [Node.js](https://nodejs.org/) + [Express](https://expressjs.com/)
 - **Database**: [sql.js](https://sql.js.org/) (SQLite via WebAssembly)
@@ -49,10 +51,11 @@ The **Multi-Sports Management System (MSMS)** is a comprehensive, database-drive
 
 ## 💾 Database Architecture
 
-MSMS is powered by a robust 3NF relational schema consisting of **13 Tables**, **5 Views**, and **4 Triggers**.
+MSMS is powered by a robust 3NF relational schema consisting of **15 Tables**, **5 Views**, and **4 Triggers**.
 
 - **Triggers**: Automated data integrity and statistics updates. For example, logging a `goal` event automatically increments the player's career goals and the team's score.
 - **Views**: Complex analytical queries (like Standings and Player Stats) are offloaded to stored database views for maximum performance.
+- **Junction Tables**: Advanced relationship management for multi-sport athletes and multi-team memberships (e.g., `player_sports`, `player_team_memberships`).
 - **Normalization**: Ensures zero data redundancy and maintains referential integrity using `ON DELETE CASCADE` and `ON DELETE SET NULL` constraints.
 
 ---
