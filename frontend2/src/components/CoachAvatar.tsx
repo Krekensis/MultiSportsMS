@@ -17,6 +17,7 @@ export function CoachAvatar({ src, alt, className }: CoachAvatarProps) {
       src={imageSrc}
       alt={alt}
       className={cn("h-12 w-12 rounded-md bg-transparent object-cover", className)}
+      referrerPolicy="no-referrer"
       onError={() => setImageSrc(PLACEHOLDER_SRC)}
     />
   );

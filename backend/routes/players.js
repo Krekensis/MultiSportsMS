@@ -342,6 +342,10 @@ router.post('/', (req, res) => {
     try {
         const db = req.app.locals.db;
         const {
+            first_name,
+            last_name,
+            email,
+            date_of_birth,
             gender,
             memberships,
             sport_ids,

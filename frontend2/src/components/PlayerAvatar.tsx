@@ -17,6 +17,7 @@ export function PlayerAvatar({ src, alt, className }: PlayerAvatarProps) {
       src={imageSrc}
       alt={alt}
       className={cn("h-12 w-12 bg-transparent object-contain", className)}
+      referrerPolicy="no-referrer"
       onError={() => setImageSrc(PLACEHOLDER_SRC)}
     />
   );
