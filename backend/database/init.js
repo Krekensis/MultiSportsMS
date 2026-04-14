@@ -61,27 +61,7 @@ function applyMigrations(db) {
         db.run('ALTER TABLE matches ADD COLUMN sport_id INTEGER REFERENCES sports(sport_id) ON DELETE CASCADE');
     }
 
-    db.run(`
-        CREATE TABLE IF NOT EXISTS player_team_memberships (
-            membership_id    INTEGER PRIMARY KEY AUTOINCREMENT,
-            player_id        INTEGER NOT NULL,
-            team_id          INTEGER NOT NULL,
-            jersey_number    INTEGER,
-            position         TEXT,
-            membership_type  TEXT    NOT NULL DEFAULT 'club' CHECK (membership_type IN ('club', 'country', 'loan', 'academy', 'other')),
-            is_active        BOOLEAN DEFAULT 1,
-            start_date       DATE    DEFAULT CURRENT_DATE,
-            end_date         DATE,
-            notes            TEXT,
-            created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE (player_id, team_id, membership_type, is_active),
-            FOREIGN KEY (player_id) REFERENCES players(player_id) ON DELETE CASCADE,
-            FOREIGN KEY (team_id)   REFERENCES teams(team_id)   ON DELETE CASCADE
-        )
-    `);
-
-    db.run('CREATE INDEX IF NOT EXISTS idx_memberships_player ON player_team_memberships(player_id, is_active)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_memberships_team ON player_team_memberships(team_id, is_active)');
+    ensurePlayerMembershipsSchema(db);
 
     db.run(`
         INSERT OR IGNORE INTO player_team_memberships
@@ -236,6 +216,83 @@ function applyMigrations(db) {
         WHERE m.match_date >= DATE('now') AND m.status = 'scheduled'
         GROUP BY m.match_id
         ORDER BY m.match_date ASC
+    `);
+}
+
+function ensurePlayerMembershipsSchema(db) {
+    const membershipTableSql = db.exec(`
+        SELECT sql
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'player_team_memberships'
+    `)?.[0]?.values?.[0]?.[0] || '';
+
+    const hasLegacyMembershipUnique = membershipTableSql.includes('UNIQUE (player_id, team_id, membership_type, is_active)');
+
+    if (hasLegacyMembershipUnique) {
+        console.log('[DB] Applying migration: rebuild player_team_memberships with active-only uniqueness');
+        db.run('DROP VIEW IF EXISTS v_player_statistics');
+        db.run('DROP VIEW IF EXISTS v_top_scorers');
+        db.run('DROP VIEW IF EXISTS v_team_roster');
+        db.run('DROP VIEW IF EXISTS v_upcoming_matches');
+        db.run('DROP INDEX IF EXISTS idx_memberships_player');
+        db.run('DROP INDEX IF EXISTS idx_memberships_team');
+        db.run('DROP INDEX IF EXISTS idx_memberships_active_unique');
+        db.run(`
+            CREATE TABLE player_team_memberships_new (
+                membership_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+                player_id        INTEGER NOT NULL,
+                team_id          INTEGER NOT NULL,
+                jersey_number    INTEGER,
+                position         TEXT,
+                membership_type  TEXT    NOT NULL DEFAULT 'club' CHECK (membership_type IN ('club', 'country', 'loan', 'academy', 'other')),
+                is_active        BOOLEAN DEFAULT 1,
+                start_date       DATE    DEFAULT CURRENT_DATE,
+                end_date         DATE,
+                notes            TEXT,
+                created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (player_id) REFERENCES players(player_id) ON DELETE CASCADE,
+                FOREIGN KEY (team_id)   REFERENCES teams(team_id)   ON DELETE CASCADE
+            )
+        `);
+        db.run(`
+            INSERT INTO player_team_memberships_new (
+                membership_id, player_id, team_id, jersey_number, position,
+                membership_type, is_active, start_date, end_date, notes, created_at
+            )
+            SELECT
+                membership_id, player_id, team_id, jersey_number, position,
+                membership_type, is_active, start_date, end_date, notes, created_at
+            FROM player_team_memberships
+            ORDER BY membership_id
+        `);
+        db.run('DROP TABLE player_team_memberships');
+        db.run('ALTER TABLE player_team_memberships_new RENAME TO player_team_memberships');
+    } else {
+        db.run(`
+            CREATE TABLE IF NOT EXISTS player_team_memberships (
+                membership_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+                player_id        INTEGER NOT NULL,
+                team_id          INTEGER NOT NULL,
+                jersey_number    INTEGER,
+                position         TEXT,
+                membership_type  TEXT    NOT NULL DEFAULT 'club' CHECK (membership_type IN ('club', 'country', 'loan', 'academy', 'other')),
+                is_active        BOOLEAN DEFAULT 1,
+                start_date       DATE    DEFAULT CURRENT_DATE,
+                end_date         DATE,
+                notes            TEXT,
+                created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (player_id) REFERENCES players(player_id) ON DELETE CASCADE,
+                FOREIGN KEY (team_id)   REFERENCES teams(team_id)   ON DELETE CASCADE
+            )
+        `);
+    }
+
+    db.run('CREATE INDEX IF NOT EXISTS idx_memberships_player ON player_team_memberships(player_id, is_active)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_memberships_team ON player_team_memberships(team_id, is_active)');
+    db.run(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_active_unique
+        ON player_team_memberships(player_id, team_id, membership_type)
+        WHERE is_active = 1
     `);
 }
 

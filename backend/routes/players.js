@@ -129,7 +129,9 @@ function validateMemberships(db, memberships, playerId = null, allowedSportIds =
     const validatedSportIds = new Set();
 
     // If playerId is provided but allowedSportIds is not, load from DB
-    let effectiveSportIds = allowedSportIds;
+    let effectiveSportIds = Array.isArray(allowedSportIds)
+        ? allowedSportIds.map((sportId) => Number(sportId)).filter((sportId) => !Number.isNaN(sportId))
+        : allowedSportIds;
     if (playerId && !effectiveSportIds) {
         const sports = db.prepare('SELECT sport_id FROM player_sports WHERE player_id = ?').all(playerId);
         effectiveSportIds = sports.map(s => s.sport_id);
@@ -171,17 +173,76 @@ function syncPlayerSports(db, playerId, sportIds) {
 
     db.prepare('DELETE FROM player_sports WHERE player_id = ?').run(playerId);
     const insert = db.prepare('INSERT INTO player_sports (player_id, sport_id) VALUES (?, ?)');
-    for (const sportId of sportIds) {
+    const normalizedSportIds = [...new Set(
+        sportIds
+            .map((sportId) => Number(sportId))
+            .filter((sportId) => !Number.isNaN(sportId))
+    )];
+
+    for (const sportId of normalizedSportIds) {
         insert.run(playerId, sportId);
     }
 }
 
+function resolveSportIds(db, sportIds, memberships = null, fallbackPlayerId = null) {
+    if (Array.isArray(sportIds)) {
+        return [...new Set(
+            sportIds
+                .map((sportId) => Number(sportId))
+                .filter((sportId) => !Number.isNaN(sportId))
+        )];
+    }
+
+    if (Array.isArray(memberships) && memberships.length) {
+        const derivedSportIds = memberships.map((membership) => {
+            const team = db.prepare('SELECT sport_id FROM teams WHERE team_id = ?').get(membership.team_id);
+            return team?.sport_id;
+        }).filter((sportId) => sportId !== undefined);
+
+        return [...new Set(derivedSportIds)];
+    }
+
+    if (fallbackPlayerId) {
+        return db.prepare('SELECT sport_id FROM player_sports WHERE player_id = ?').all(fallbackPlayerId).map((row) => row.sport_id);
+    }
+
+    return null;
+}
+
 function replaceMemberships(db, playerId, memberships) {
-    db.prepare(`
+    const existingMemberships = db.prepare(`
+        SELECT membership_id, team_id, membership_type
+        FROM player_team_memberships
+        WHERE player_id = ? AND is_active = 1
+    `).all(playerId);
+
+    const existingByKey = new Map(
+        existingMemberships.map((membership) => [
+            `${membership.team_id}:${membership.membership_type}`,
+            membership,
+        ])
+    );
+
+    const desiredKeys = new Set(memberships.map((membership) => `${membership.team_id}:${membership.membership_type}`));
+
+    const deactivateMembership = db.prepare(`
         UPDATE player_team_memberships
         SET is_active = 0, end_date = COALESCE(end_date, CURRENT_DATE)
-        WHERE player_id = ? AND is_active = 1
-    `).run(playerId);
+        WHERE membership_id = ?
+    `);
+
+    for (const membership of existingMemberships) {
+        const key = `${membership.team_id}:${membership.membership_type}`;
+        if (!desiredKeys.has(key)) {
+            deactivateMembership.run(membership.membership_id);
+        }
+    }
+
+    const updateMembership = db.prepare(`
+        UPDATE player_team_memberships
+        SET jersey_number = ?, position = ?, start_date = ?, end_date = ?, notes = ?, is_active = 1
+        WHERE membership_id = ?
+    `);
 
     const insertMembership = db.prepare(`
         INSERT INTO player_team_memberships
@@ -190,19 +251,46 @@ function replaceMemberships(db, playerId, memberships) {
     `);
 
     for (const membership of memberships) {
-        insertMembership.run(
-            playerId,
-            membership.team_id,
-            membership.jersey_number,
-            membership.position,
-            membership.membership_type,
-            membership.start_date,
-            membership.end_date,
-            membership.notes,
-        );
+        const key = `${membership.team_id}:${membership.membership_type}`;
+        const existingMembership = existingByKey.get(key);
+
+        if (existingMembership) {
+            updateMembership.run(
+                membership.jersey_number,
+                membership.position,
+                membership.start_date,
+                membership.end_date,
+                membership.notes,
+                existingMembership.membership_id,
+            );
+        } else {
+            insertMembership.run(
+                playerId,
+                membership.team_id,
+                membership.jersey_number,
+                membership.position,
+                membership.membership_type,
+                membership.start_date,
+                membership.end_date,
+                membership.notes,
+            );
+        }
     }
 
     syncPlayerPrimaryMembership(db, playerId);
+}
+
+function handlePlayerWriteError(res, err) {
+    if (err.message.includes('UNIQUE constraint failed: players.email')) {
+        return res.status(409).json({ error: 'A player with this email already exists' });
+    }
+    if (err.message.includes('UNIQUE constraint failed: player_team_memberships')) {
+        return res.status(409).json({ error: 'An active membership with this team and membership type already exists for the player' });
+    }
+    if (isMembershipValidationError(err.message)) {
+        return res.status(400).json({ error: err.message });
+    }
+    return res.status(500).json({ error: err.message });
 }
 
 function attachMembershipsAndSports(db, players) {
@@ -361,7 +449,8 @@ router.post('/', (req, res) => {
 
         const fallbackMembership = team_id ? { team_id, jersey_number, position, membership_type: 'club' } : null;
         const normalizedMemberships = normalizeMemberships(memberships, fallbackMembership);
-        validateMemberships(db, normalizedMemberships, null, sport_ids);
+        const resolvedSportIds = resolveSportIds(db, sport_ids, normalizedMemberships);
+        validateMemberships(db, normalizedMemberships, null, resolvedSportIds);
 
         const runCreate = db.transaction(() => {
             const result = db.prepare(`
@@ -380,8 +469,8 @@ router.post('/', (req, res) => {
                 replaceMemberships(db, result.lastInsertRowid, normalizedMemberships);
             }
 
-            if (sport_ids) {
-                syncPlayerSports(db, result.lastInsertRowid, sport_ids);
+            if (resolvedSportIds) {
+                syncPlayerSports(db, result.lastInsertRowid, resolvedSportIds);
             }
 
             return result.lastInsertRowid;
@@ -392,13 +481,7 @@ router.post('/', (req, res) => {
 
         res.status(201).json(attachMembershipsAndSports(db, [player])[0]);
     } catch (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-            return res.status(409).json({ error: 'A player with this email already exists' });
-        }
-        if (isMembershipValidationError(err.message)) {
-            return res.status(400).json({ error: err.message });
-        }
-        res.status(500).json({ error: err.message });
+        return handlePlayerWriteError(res, err);
     }
 });
 
@@ -431,8 +514,15 @@ router.put('/:id', (req, res) => {
         const fallbackMembership = team_id ? { team_id, jersey_number, position, membership_type: 'club' } : null;
         const normalizedMemberships = hasMembershipPayload ? normalizeMemberships(memberships, fallbackMembership) : null;
 
+        const resolvedSportIds = resolveSportIds(
+            db,
+            req.body.sport_ids,
+            normalizedMemberships,
+            Number(req.params.id),
+        );
+
         if (normalizedMemberships) {
-            validateMemberships(db, normalizedMemberships, Number(req.params.id), req.body.sport_ids);
+            validateMemberships(db, normalizedMemberships, Number(req.params.id), resolvedSportIds);
         }
 
         const runUpdate = db.transaction(() => {
@@ -452,8 +542,8 @@ router.put('/:id', (req, res) => {
                 req.params.id,
             );
 
-            if (req.body.sport_ids) {
-                syncPlayerSports(db, Number(req.params.id), req.body.sport_ids);
+            if (resolvedSportIds) {
+                syncPlayerSports(db, Number(req.params.id), resolvedSportIds);
             }
 
             if (normalizedMemberships) {
@@ -466,13 +556,7 @@ router.put('/:id', (req, res) => {
         const player = db.prepare('SELECT * FROM players WHERE player_id = ?').get(req.params.id);
         res.json(attachMembershipsAndSports(db, [player])[0]);
     } catch (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-            return res.status(409).json({ error: 'A player with this email already exists' });
-        }
-        if (isMembershipValidationError(err.message)) {
-            return res.status(400).json({ error: err.message });
-        }
-        res.status(500).json({ error: err.message });
+        return handlePlayerWriteError(res, err);
     }
 });
 

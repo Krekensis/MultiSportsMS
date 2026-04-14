@@ -131,7 +131,7 @@ export default function PlayersPage() {
       qc.invalidateQueries({ queryKey: ["players"] });
       toast.success("Player deleted");
     },
-    onError: () => toast.error("Failed to delete player"),
+    onError: (error) => toast.error(error.message || "Failed to delete player"),
   });
 
   const filtered = players?.filter((player) => {
@@ -440,6 +440,19 @@ export default function PlayersPage() {
                           sport_ids: checked
                             ? [...current.sport_ids, sport.sport_id]
                             : current.sport_ids.filter((id) => id !== sport.sport_id),
+                          memberships: (() => {
+                            const nextSportIds = checked
+                              ? [...current.sport_ids, sport.sport_id]
+                              : current.sport_ids.filter((id) => id !== sport.sport_id);
+
+                            const filteredMemberships = current.memberships.filter((membership) => {
+                              if (!membership.team_id) return true;
+                              const team = teams?.find((candidate) => candidate.team_id === Number(membership.team_id));
+                              return team ? nextSportIds.includes(team.sport_id) : true;
+                            });
+
+                            return filteredMemberships.length > 0 ? filteredMemberships : [emptyMembership()];
+                          })(),
                         }));
                       }}
                     />
