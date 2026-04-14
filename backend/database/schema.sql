@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS players (
     player_id     INTEGER PRIMARY KEY AUTOINCREMENT,
     first_name    TEXT    NOT NULL,
     last_name     TEXT    NOT NULL,
-    email         TEXT    UNIQUE,
+    email         TEXT,
     date_of_birth DATE,
     gender        TEXT    CHECK (gender IN ('Male', 'Female', 'Other')),
     team_id       INTEGER,
@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS player_team_memberships (
     end_date         DATE,
     notes            TEXT,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+
     FOREIGN KEY (player_id) REFERENCES players(player_id) ON DELETE CASCADE,
     FOREIGN KEY (team_id)   REFERENCES teams(team_id)   ON DELETE CASCADE
 );
@@ -305,11 +306,10 @@ CREATE TABLE IF NOT EXISTS match_rosters (
 -- INDEXES (7 performance indexes on frequently queried columns)
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_players_team       ON players(team_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_players_email_active ON players(email) WHERE is_deleted = 0;
 CREATE INDEX IF NOT EXISTS idx_memberships_player ON player_team_memberships(player_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_memberships_team   ON player_team_memberships(team_id, is_active);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_active_unique
-ON player_team_memberships(player_id, team_id, membership_type)
-WHERE is_active = 1;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_active ON player_team_memberships(player_id, team_id, membership_type) WHERE is_active = 1;
 CREATE INDEX IF NOT EXISTS idx_matches_event      ON matches(event_id);
 CREATE INDEX IF NOT EXISTS idx_matches_date       ON matches(match_date);
 CREATE INDEX IF NOT EXISTS idx_match_events_match ON match_events(match_id);
