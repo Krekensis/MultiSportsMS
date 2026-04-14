@@ -61,6 +61,10 @@ function applyMigrations(db) {
         db.run('ALTER TABLE matches ADD COLUMN sport_id INTEGER REFERENCES sports(sport_id) ON DELETE CASCADE');
     }
 
+    // Add partial unique index for emails (allows reuse for deleted players)
+    // Note: Column-level UNIQUE constraint on 'email' may still exist if created via old schema.
+    db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_players_email_active ON players(email) WHERE is_deleted = 0');
+
     db.run(`
         CREATE TABLE IF NOT EXISTS player_team_memberships (
             membership_id    INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -393,7 +393,13 @@ router.post('/', (req, res) => {
         res.status(201).json(attachMembershipsAndSports(db, [player])[0]);
     } catch (err) {
         if (err.message.includes('UNIQUE constraint failed')) {
-            return res.status(409).json({ error: 'A player with this email already exists' });
+            if (err.message.includes('players.email')) {
+                return res.status(409).json({ error: 'A player with this email already exists' });
+            }
+            if (err.message.includes('player_team_memberships')) {
+                return res.status(409).json({ error: 'This player already has an active membership for that team and type' });
+            }
+            return res.status(409).json({ error: `Database conflict: ${err.message}` });
         }
         if (isMembershipValidationError(err.message)) {
             return res.status(400).json({ error: err.message });
@@ -467,7 +473,13 @@ router.put('/:id', (req, res) => {
         res.json(attachMembershipsAndSports(db, [player])[0]);
     } catch (err) {
         if (err.message.includes('UNIQUE constraint failed')) {
-            return res.status(409).json({ error: 'A player with this email already exists' });
+            if (err.message.includes('players.email')) {
+                return res.status(409).json({ error: 'A player with this email already exists' });
+            }
+            if (err.message.includes('player_team_memberships')) {
+                return res.status(409).json({ error: 'This player already has an active membership for that team and type' });
+            }
+            return res.status(409).json({ error: `Database conflict: ${err.message}` });
         }
         if (isMembershipValidationError(err.message)) {
             return res.status(400).json({ error: err.message });
